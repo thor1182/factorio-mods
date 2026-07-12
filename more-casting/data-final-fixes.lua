@@ -135,7 +135,9 @@ local function ingredientsMagic(ingredients)
     local moltenCopperIngredients = 0
     local moltenIronAmount = 0
     local moltenCopperAmount = 0
-    local hasFluid = false
+    local hasMoltenIron = false
+    local hasMoltenCopper = false
+    local differentFluidAmount = 0
     local toRemove = {}
 
     if ingredients and #ingredients > 0 then
@@ -156,26 +158,42 @@ local function ingredientsMagic(ingredients)
                     toRemove[tostring(index)] = true
                 end
             elseif ingredient.type == "fluid" then
-                hasFluid = true
+                if ingredient.name == "molten-iron" then
+                    hasMoltenIron = true
+                elseif ingredient.name == "molten-copper" then
+                    hasMoltenCopper = true
+                else
+                    differentFluidAmount = differentFluidAmount + 1
+                end
             end
         end
 
-        if hasFluid and (moltenIronAmount > 0 or moltenCopperAmount > 0) then
+        local moltenIronIncluded = moltenIronIngredients > 0 or hasMoltenIron
+        local moltenCopperIncluded = moltenCopperIngredients > 0 or hasMoltenCopper
+
+        if (moltenIronIncluded and moltenCopperIncluded and differentFluidAmount > 0) or ((moltenIronIncluded or moltenCopperIncluded) and differentFluidAmount > 1) then
             moltenIronAmount = 0
             moltenCopperAmount = 0
         else
+            local totalMoltenIronAmount = moltenIronIngredients > 0 and math.ceil(moltenIronAmount * (1 - (moltenIronIngredients / 10))) or 0
+            local totalMoltenCopperAmount = moltenCopperIngredients > 0 and math.ceil(moltenCopperAmount * (1 - (moltenCopperIngredients / 10))) or 0
+
             for i = #ingredients, 1, -1 do
                 if toRemove[tostring(i)] then
                     table.remove(ingredients, i)
+                elseif ingredients[i].name == "molten-iron" and totalMoltenIronAmount > 0 then
+                    ingredients[i].amount = ingredients[i].amount + totalMoltenIronAmount
+                elseif ingredients[i].name == "molten-copper" and totalMoltenCopperAmount > 0 then
+                    ingredients[i].amount = ingredients[i].amount + totalMoltenCopperAmount
                 end
             end
 
-            if moltenIronAmount > 0 then
-                table.insert(ingredients, { type = "fluid", name = "molten-iron", amount = moltenIronAmount * (1 - (moltenIronIngredients / 10)), fluidbox_multiplier = 10 })
+            if totalMoltenIronAmount > 0 and not hasMoltenIron then
+                table.insert(ingredients, { type = "fluid", name = "molten-iron", amount = totalMoltenIronAmount, fluidbox_multiplier = 10 })
             end
 
-            if moltenCopperAmount > 0 then
-                table.insert(ingredients, { type = "fluid", name = "molten-copper", amount = moltenCopperAmount * (1 - (moltenCopperIngredients / 10)), fluidbox_multiplier = 10 })
+            if totalMoltenCopperAmount > 0 and not hasMoltenCopper then
+                table.insert(ingredients, { type = "fluid", name = "molten-copper", amount = totalMoltenCopperAmount, fluidbox_multiplier = 10 })
             end
         end
     end
